@@ -1,0 +1,29 @@
+# Private RAW import profile for a server installation.
+# Use together with docker-compose.server.yml through COMPOSE_FILE. Neither
+# database is published outside the server: both host ports bind to loopback.
+services:
+  raw-mysql:
+    image: mysql:5.7.44
+    platform: linux/amd64
+    container_name: sertiki-raw-mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+      - --sql-mode=NO_ENGINE_SUBSTITUTION
+    environment:
+      MYSQL_DATABASE: ${RAW_MYSQL_DATABASE}
+      MYSQL_USER: ${RAW_MYSQL_USER}
+      MYSQL_PASSWORD: ${RAW_MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${RAW_MYSQL_ROOT_PASSWORD}
+    ports:
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - raw_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  raw_mysql_data:

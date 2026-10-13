@@ -19,7 +19,7 @@ The untouched source dumps are in `backups/`:
 | `10_certificate.sql.gz` | 626 MB | `pf_certificate` |
 | `11_declaration.sql.gz` | 1.8 GB | `pf_declaration` |
 
-The schema confirms both `pf_certificate` and `pf_declaration` have the fields used here, including `declType`/`certType`, classifiers, all four group fields, timestamps, and `strana`. Dumps are never altered by project scripts.
+The source tables use different document-type fields: `pf_certificate.certType` and `pf_declaration.declType`. Both include the classifiers, all four group fields, timestamps, and `strana` used by the normalizer. Dumps are never altered by project scripts.
 
 ## Prerequisites
 
@@ -115,8 +115,32 @@ pnpm typecheck
 
 Unit fixtures cover product-name cleanup, splitting, TN VED, OKPD2, technical-regulation parsing, and zero dates.
 
-## Future API deployment
+## Private server deployment
 
-The REST API and its `docker-compose.server.yml` are a future extension and are not deployed as part of the current AI-friendly site work. The existing Sertiki site runs on DIAFAN.CMS on Timeweb shared hosting, where the page card and JSON-LD use locally imported, reviewed mappings.
+The production API is not queried by public Sertiki pages. The site receives only reviewed MySQL migrations. The server stores the normalized source layer privately and can later provide a protected API.
 
-For a future production API, run the RAW restore and normalizer on a private import machine or in a separate private Compose project. RAW MySQL must remain private; do not expose port 3306/3307 or run the full normalizer during API startup.
+`docker-compose.server.yml` runs PostgreSQL and the API. `docker-compose.import.yml` adds the temporary RAW MySQL source during import. Both database ports bind only to `127.0.0.1`; do not expose 3306, 3307, 5432, or 5433 publicly.
+
+On a private server with Node.js 20+ and pnpm 10+:
+
+```bash
+git clone https://github.com/Zember007/sertiki-data.git /opt/sertiki-data
+cd /opt/sertiki-data
+cp .env.example .env
+chmod 600 .env
+# Replace every change-me value in .env with a distinct strong secret.
+
+export COMPOSE_FILE=docker-compose.server.yml:docker-compose.import.yml
+docker compose up -d postgres raw-mysql
+pnpm install --frozen-lockfile
+pnpm pg:migrate
+```
+
+Copy the four private `.sql.gz` dumps to `backups/` over SSH; they are deliberately excluded from Git. Run the compact import workflow from this README, then verify `pnpm stats`. After both sources finish, the API can be started with:
+
+```bash
+docker compose up -d --build api
+curl http://127.0.0.1:3000/health
+```
+
+Keep RAW MySQL private and do not run the normalizer automatically at API startup.
