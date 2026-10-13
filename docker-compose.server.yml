@@ -1,0 +1,33 @@
+# Production data/API stack. MODX stays in its current stack and accesses the API through Nginx.
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${SERTIKI_POSTGRES_DATABASE}
+      POSTGRES_USER: ${SERTIKI_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${SERTIKI_POSTGRES_PASSWORD}
+    volumes:
+      - sertiki_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SERTIKI_DATABASE_URL: postgres://${SERTIKI_POSTGRES_USER}:${SERTIKI_POSTGRES_PASSWORD}@postgres:5432/${SERTIKI_POSTGRES_DATABASE}
+      API_HOST: 0.0.0.0
+      API_PORT: 3000
+    ports:
+      - "127.0.0.1:3000:3000"
+
+volumes:
+  sertiki_postgres_data:
+

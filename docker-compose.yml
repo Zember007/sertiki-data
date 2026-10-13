@@ -1,0 +1,58 @@
+services:
+  raw-mysql:
+    image: mysql:5.7.44
+    platform: linux/amd64
+    container_name: sertiki-raw-mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+      - --sql-mode=NO_ENGINE_SUBSTITUTION
+    environment:
+      MYSQL_DATABASE: ${RAW_MYSQL_DATABASE}
+      MYSQL_USER: ${RAW_MYSQL_USER}
+      MYSQL_PASSWORD: ${RAW_MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${RAW_MYSQL_ROOT_PASSWORD}
+    ports:
+      - "3307:3306"
+    volumes:
+      - raw_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  sertiki-postgres:
+    image: postgres:17
+    container_name: sertiki-postgres
+    environment:
+      POSTGRES_DB: ${SERTIKI_POSTGRES_DATABASE}
+      POSTGRES_USER: ${SERTIKI_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${SERTIKI_POSTGRES_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - sertiki_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  api:
+    build: .
+    container_name: sertiki-api
+    restart: unless-stopped
+    depends_on:
+      sertiki-postgres:
+        condition: service_healthy
+    environment:
+      SERTIKI_DATABASE_URL: postgres://${SERTIKI_POSTGRES_USER}:${SERTIKI_POSTGRES_PASSWORD}@sertiki-postgres:5432/${SERTIKI_POSTGRES_DATABASE}
+      API_HOST: 0.0.0.0
+      API_PORT: 3000
+    ports:
+      - "3000:3000"
+
+volumes:
+  raw_mysql_data:
+  sertiki_postgres_data:

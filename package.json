@@ -1,0 +1,35 @@
+{
+  "name": "sertiki-data",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.28.2",
+  "scripts": {
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "raw:restore": "./scripts/restore-raw-mysql.sh --help",
+    "raw:restore:all": "./scripts/restore-raw-mysql.sh --all",
+    "raw:bootstrap": "./scripts/restore-raw-mysql.sh --bootstrap",
+    "raw:restore:certificates": "./scripts/restore-raw-mysql.sh --source certificates",
+    "raw:restore:declarations": "./scripts/restore-raw-mysql.sh --source declarations",
+    "raw:purge-source": "./scripts/purge-raw-source.sh",
+    "pg:migrate": "tsx scripts/migrate-postgres.ts",
+    "normalize:declarations": "tsx apps/normalizer/src/cli.ts --source declarations",
+    "normalize:certificates": "tsx apps/normalizer/src/cli.ts --source certificates",
+    "stats": "tsx scripts/stats.ts",
+    "api": "tsx apps/api/src/server.ts",
+    "test": "tsx --test packages/normalization/test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "fastify": "^5.6.1",
+    "mysql2": "^3.14.4",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.6",
+    "@types/pg": "^8.15.5",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}
