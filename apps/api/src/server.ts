@@ -28,9 +28,9 @@ app.get<{ Querystring: { q?: string; limit?: string } }>('/api/v1/products/searc
   const parsedLimit = Number(request.query.limit ?? 20);
   const limit = Number.isSafeInteger(parsedLimit) ? Math.max(1, Math.min(parsedLimit, 100)) : 20;
   const result = await postgres.query(`SELECT source_type, source_id, document_number, coalesce(product_name_raw, product_name_normalized) AS product_name_raw, product_name_normalized, status_normalized
-    FROM documents WHERE to_tsvector('simple', coalesce(product_name_normalized, '')) @@ plainto_tsquery('simple', $1)
-      OR product_name_normalized ILIKE '%' || $1 || '%'
-    ORDER BY source_updated_at DESC NULLS LAST, source_id DESC LIMIT $2`, [q, limit]);
+    FROM documents
+    WHERE to_tsvector('russian', coalesce(product_name_normalized, '')) @@ plainto_tsquery('russian', $1)
+    LIMIT $2`, [q, limit]);
   return { items: result.rows, limit };
 });
 
