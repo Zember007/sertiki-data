@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { postgres } from '../packages/database/src/client.js';
 
@@ -51,7 +51,6 @@ async function evidenceFor(query: string): Promise<Record<string, string | numbe
     SELECT id, source_type::text, source_id, document_type_normalized
     FROM documents
     WHERE to_tsvector('russian', coalesce(product_name_normalized, '')) @@ plainto_tsquery('russian', $1)
-    ORDER BY source_updated_at DESC NULLS LAST, source_id DESC
     LIMIT 50`, [query]);
 
   if (!documents.rowCount) {
@@ -116,14 +115,24 @@ async function main(): Promise<void> {
   const candidates = inventory.records.filter((record) => pageKind(record) === 'service_candidate');
   const header = ['source_module', 'source_id', 'url', 'title', 'query_text', 'document_count', 'document_types', 'technical_regulations', 'tnved_codes', 'okpd2_codes', 'product_groups', 'sample_document_refs', 'status'];
   const lines = [header.join(';')];
-  for (const record of candidates) {
+  const finalOutput = path.resolve(output);
+  const partialOutput = `${finalOutput}.partial`;
+  console.log(`Preparing evidence for ${candidates.length} service pages.`);
+
+  for (const [index, record] of candidates.entries()) {
     const query = queryFromTitle(record.title);
     const evidence = query ? await evidenceFor(query) : await Promise.resolve({ document_count: 0, document_types: '', technical_regulations: '', tnved_codes: '', okpd2_codes: '', product_groups: '', sample_document_refs: '' });
     const values = [record.source_module, record.source_id, record.url, record.title, query, evidence.document_count, evidence.document_types, evidence.technical_regulations, evidence.tnved_codes, evidence.okpd2_codes, evidence.product_groups, evidence.sample_document_refs, 'needs_review'];
     lines.push(values.map(csv).join(';'));
+
+    const processed = index + 1;
+    if (processed % 25 === 0 || processed === candidates.length) {
+      await writeFile(partialOutput, lines.join('\n') + '\n', 'utf8');
+      console.log(`Prepared ${processed}/${candidates.length} evidence rows.`);
+    }
   }
-  await writeFile(path.resolve(output), lines.join('\n') + '\n', 'utf8');
-  console.log(`Wrote ${candidates.length} evidence rows to ${path.resolve(output)}. All rows require legal and price review before publication.`);
+  await rename(partialOutput, finalOutput);
+  console.log(`Wrote ${candidates.length} evidence rows to ${finalOutput}. All rows require legal and price review before publication.`);
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; }).finally(async () => { await postgres.end(); });
